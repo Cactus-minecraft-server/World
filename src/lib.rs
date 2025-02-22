@@ -1,80 +1,44 @@
-// Example Code
-
 use noise::{NoiseFn, Perlin};
-#[derive(Debug, Clone, Copy)]
-enum BlockType {
-    Air,
-    Grass,
-    Dirt,
-    Stone,
-    Water,
-}
-const CHUNK_SIZE: usize = 16;
-const CHUNK_HEIGHT: usize = 128;
 
-type Chunk = Vec<Vec<Vec<BlockType>>>;
+/// Generates a 16x16 noise map for a given chunk, based on a seed and chunk coordinates.
+///
+/// # Arguments
+/// - `seed`: A number influencing the noise generation (e.g., 42).
+/// - `chunk_x`: The X coordinate of the chunk.
+/// - `chunk_z`: The Z coordinate of the chunk.
+/// - `scale`: The noise scale (smaller = more detailed noise).
+///
+/// # Returns
+/// - A **16x16 noise map** as `[[f64; 16]; 16]`, normalized between -64 and 324.
+pub fn generate_normalized_noise_map(
+    seed: u32,
+    chunk_x: i32,
+    chunk_z: i32,
+    scale: f64,
+) -> [[f64; 16]; 16] {
+    let perlin = Perlin::new(seed);
+    let mut noise_map = [[0.0; 16]; 16];
 
-fn main() {
-    let perlin = Perlin::new(42);
-    let scale = 0.1;
-    let x = 10.0 * scale;
-    let y = 20.0 * scale;
-    let noise_value = perlin.get([x, y]);
-    println!("Noise value: {}", noise_value);
-}
-fn fbm(perlin: &Perlin, x: f64, y: f64, octaves: u32, persistence: f64) -> f64 {
-    let mut total = 0.0;
-    let mut amplitude = 1.0;
-    let mut frequency = 1.0;
-    let mut max_value = 0.0;
+    // Define normalization range
+    let min_range = -64.0;
+    let max_range = 320.0;
 
-    for _ in 0..octaves {
-        total += perlin.get([x * frequency, y * frequency]) * amplitude;
-        max_value += amplitude;
-        amplitude *= persistence;
-        frequency *= 2.0;
-    }
-    total / max_value
-}
+    for x in 0..16 {
+        for z in 0..16 {
+            // Convert chunk-local coordinates to global world coordinates
+            let world_x = (chunk_x * 16 + x as i32) as f64 * scale;
+            let world_z = (chunk_z * 16 + z as i32) as f64 * scale;
 
-fn map_noise_to_height(noise_value: f64) -> usize {
-    let normalized = (noise_value + 1.0) / 2.0; // map from [-1, 1] to [0, 1]
-    let max_height = 128;
-    (normalized * max_height as f64) as usize
-}
-fn generate_chunk(perlin: &Perlin, chunk_x: i32, chunk_z: i32) -> Chunk {
-    let mut chunk = vec![vec![vec![BlockType::Air; CHUNK_HEIGHT]; CHUNK_SIZE]; CHUNK_SIZE];
-    let scale = 0.1;
+            // Generate Perlin noise value (between -1 and 1)
+            let noise_value = perlin.get([world_x, world_z]);
 
-    for local_x in 0..CHUNK_SIZE {
-        for local_z in 0..CHUNK_SIZE {
-            let world_x = chunk_x * CHUNK_SIZE as i32 + local_x as i32;
-            let world_z = chunk_z * CHUNK_SIZE as i32 + local_z as i32;
-            let noise_value = fbm(
-                perlin,
-                world_x as f64 * scale,
-                world_z as f64 * scale,
-                4,
-                0.5,
-            );
-            let height = map_noise_to_height(noise_value);
+            // Normalize noise from [-1,1] to [-64,324]
+            let normalized_noise = (noise_value + 1.0) / 2.0 * (max_range - min_range) + min_range;
 
-            for y in 0..CHUNK_HEIGHT {
-                if y > height {
-                    chunk[local_x][local_z][y] = if y < 64 {
-                        BlockType::Water
-                    } else {
-                        BlockType::Air
-                    };
-                } else if y == height {
-                    chunk[local_x][local_z][y] = BlockType::Grass;
-                } else if y > height.saturating_sub(3) {
-                    chunk[local_x][local_z][y] = BlockType::Dirt;
-                } else {
-                    chunk[local_x][local_z][y] = BlockType::Stone;
-                }
-            }
+            // Store the normalized noise value
+            noise_map[x][z] = normalized_noise;
         }
     }
-    chunk
+
+    noise_map
 }
