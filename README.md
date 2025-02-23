@@ -1,6 +1,6 @@
-# Noise-engine
+# Worldgen
 
-The **Noise-engine** module, implemented in Rust, serves as a specialized component for generating procedural noise functions integral to the **Cactus** Minecraft server. This project is tailored to address the computational and algorithmic requirements of Minecraft's world generation, with a concentrated focus on noise types essential for creating diverse and dynamic environments.
+The **Worldgen** module, implemented in Rust, serves as a specialized component for generating procedural noise functions integral to the **Cactus** Minecraft server. This project is tailored to address the computational and algorithmic requirements of Minecraft's world generation, with a concentrated focus on noise types essential for creating diverse and dynamic environments.
 
 ## Features
 
@@ -25,5 +25,3 @@ Given its specialized role as a server-integrated module, contributions from ext
 ## License
 
 This project is distributed under the terms of the [Mozilla Public License 2.0](LICENSE).
-
-

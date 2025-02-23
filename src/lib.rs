@@ -39,6 +39,19 @@ pub fn generate_normalized_noise_map(
             noise_map[x][z] = normalized_noise;
         }
     }
-
     noise_map
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::generate_normalized_noise_map;
+
+    #[test]
+    fn test_generate_normalized_noise_map() {
+        let noise_map = generate_normalized_noise_map(456, 0, 0, 0.1);
+        assert_eq!(noise_map.len(), 16);
+        for row in noise_map.iter() {
+            assert_eq!(row.len(), 16)
+        }
+    }
 }
