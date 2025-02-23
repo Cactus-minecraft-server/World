@@ -1,6 +1,7 @@
-use noise::{NoiseFn, Perlin};
+use noise::{Fbm, MultiFractal, NoiseFn, Perlin};
 
-/// Generates a 16x16 noise map for a given chunk, based on a seed and chunk coordinates.
+/// Generates a 16x16 noise map for a given chunk using fractal noise with multiple octaves
+/// to avoid repetitive patterns.
 ///
 /// # Arguments
 /// - `seed`: A number influencing the noise generation (e.g., 42).
@@ -16,7 +17,8 @@ pub fn generate_normalized_noise_map(
     chunk_z: i32,
     scale: f64,
 ) -> [[f64; 16]; 16] {
-    let perlin = Perlin::new(seed);
+    // Spécifier explicitement que Fbm utilise Perlin comme bruit de base
+    let fbm = Fbm::<Perlin>::new(seed).set_octaves(15);
     let mut noise_map = [[0.0; 16]; 16];
 
     // Define normalization range
@@ -29,8 +31,8 @@ pub fn generate_normalized_noise_map(
             let world_x = (chunk_x * 16 + x as i32) as f64 * scale;
             let world_z = (chunk_z * 16 + z as i32) as f64 * scale;
 
-            // Generate Perlin noise value (between -1 and 1)
-            let noise_value = perlin.get([world_x, world_z]);
+            // Generate fractal noise value (with multiple octaves)
+            let noise_value = fbm.get([world_x, world_z]);
 
             // Normalize noise from [-1,1] to [-64,324]
             let normalized_noise = (noise_value + 1.0) / 2.0 * (max_range - min_range) + min_range;
@@ -44,14 +46,14 @@ pub fn generate_normalized_noise_map(
 
 #[cfg(test)]
 mod tests {
-    use crate::generate_normalized_noise_map;
+    use super::*;
 
     #[test]
     fn test_generate_normalized_noise_map() {
         let noise_map = generate_normalized_noise_map(456, 0, 0, 0.1);
         assert_eq!(noise_map.len(), 16);
         for row in noise_map.iter() {
-            assert_eq!(row.len(), 16)
+            assert_eq!(row.len(), 16);
         }
     }
 }

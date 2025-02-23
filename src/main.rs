@@ -4,7 +4,7 @@ use worldgen::generate_normalized_noise_map; // Import rayon for parallel proces
 
 fn main() {
     // Define parameters
-    let radius = 320;
+    let radius = 300;
     let chunk_size = 16;
     let num_chunks = 2 * radius + 1; // number of chunks per dimension (65 here)
     let img_width = num_chunks * chunk_size;
@@ -19,7 +19,7 @@ fn main() {
     let chunk_results: Vec<(i32, i32, [[f64; 16]; 16])> = chunk_coords
         .into_par_iter()
         .map(|(cx, cz)| {
-            let noise_map = generate_normalized_noise_map(42, cx, cz, 0.01);
+            let noise_map = generate_normalized_noise_map(42, cx, cz, 0.001);
             (cx, cz, noise_map)
         })
         .collect();
