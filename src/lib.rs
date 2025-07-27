@@ -1,59 +1,70 @@
-use noise::{Fbm, MultiFractal, NoiseFn, Perlin};
-
-/// Generates a 16x16 noise map for a given chunk using fractal noise with multiple octaves
-/// to avoid repetitive patterns.
-///
-/// # Arguments
-/// - `seed`: A number influencing the noise generation (e.g., 42).
-/// - `chunk_x`: The X coordinate of the chunk.
-/// - `chunk_z`: The Z coordinate of the chunk.
-/// - `scale`: The noise scale (smaller = more detailed noise).
-///
-/// # Returns
-/// - A **16x16 noise map** as `[[f64; 16]; 16]`, normalized between -64 and 324.
-pub fn generate_normalized_noise_map(
-    seed: u32,
-    chunk_x: i32,
-    chunk_z: i32,
+pub struct Noise {
     scale: f64,
-) -> [[f64; 16]; 16] {
-    // Spécifier explicitement que Fbm utilise Perlin comme bruit de base
-    let fbm = Fbm::<Perlin>::new(seed).set_octaves(15);
-    let mut noise_map = [[0.0; 16]; 16];
-
-    // Define normalization range
-    let min_range = -64.0;
-    let max_range = 320.0;
-
-    for x in 0..16 {
-        for z in 0..16 {
-            // Convert chunk-local coordinates to global world coordinates
-            let world_x = (chunk_x * 16 + x as i32) as f64 * scale;
-            let world_z = (chunk_z * 16 + z as i32) as f64 * scale;
-
-            // Generate fractal noise value (with multiple octaves)
-            let noise_value = fbm.get([world_x, world_z]);
-
-            // Normalize noise from [-1,1] to [-64,324]
-            let normalized_noise = (noise_value + 1.0) / 2.0 * (max_range - min_range) + min_range;
-
-            // Store the normalized noise value
-            noise_map[x][z] = normalized_noise;
-        }
-    }
-    noise_map
+    amplitude: f64,
 }
-
+pub struct Vector {
+    x: f32,
+    y: f32,
+}
+impl Noise {
+    pub fn new(scale: f64, amplitude: f64) -> Self {
+        Self { scale, amplitude }
+    }
+    pub fn get(&self, x: f64, z: f64) -> f64 {
+        let xs = x / self.scale;
+        let zs = z / self.scale;
+        self.perlin(xs, zs) * self.amplitude
+    }
+    fn perlin(&self, x: f64, z: f64) -> f64 {
+        // implement Perlin noise here (then simplex because it's harder)
+        todo!()
+    }
+}
+fn dot_product(v1: Vector, v2: Vector) -> f32 {
+    // Calculate the dot product between v1 and v2 using their coordinates.  the result->f32.
+    v1.x * v2.x + v1.y * v2.y
+}
+fn calculate_norm(v1: &Vector) -> f32 {
+    // Calculate the norm of a vector using it's coordinates.  the result -> f32.
+    (v1.x.powi(2) + v1.y.powi(2)).sqrt()
+}
+fn normalize(v1: &Vector) -> Vector {
+    // This function aim that every vector created randomly has the same norm (1).
+    Vector {
+        x: v1.x / calculate_norm(v1),
+        y: v1.y / calculate_norm(v1),
+    }
+}
 #[cfg(test)]
 mod tests {
-    use super::*;
-
+    use crate::{Vector, calculate_norm, dot_product, normalize};
     #[test]
-    fn test_generate_normalized_noise_map() {
-        let noise_map = generate_normalized_noise_map(456, 0, 0, 0.1);
-        assert_eq!(noise_map.len(), 16);
-        for row in noise_map.iter() {
-            assert_eq!(row.len(), 16);
-        }
+    fn test_dot_product() {
+        assert_eq!(
+            dot_product(Vector { x: 1.0, y: 0.0 }, Vector { x: 0.0, y: 1.0 }),
+            0.0
+        );
+        assert_eq!(
+            dot_product(Vector { x: 1.0, y: 0.5 }, Vector { x: 0.2, y: 1.0 }),
+            0.7,
+        );
+        assert_eq!(
+            dot_product(Vector { x: 1.0, y: 0.5 }, Vector { x: -0.2, y: -1.0 }),
+            -0.7,
+        );
+    }
+    #[test]
+    fn test_calculate_norm() {
+        assert_eq!(calculate_norm(&Vector { x: 0.5, y: 0.5 }), 0.5_f32.sqrt());
+        assert_eq!(calculate_norm(&Vector { x: 0.7, y: 0.3 }), 0.58_f32.sqrt());
+        assert_eq!(
+            calculate_norm(&Vector { x: -0.7, y: -0.3 }),
+            calculate_norm(&Vector { x: 0.7, y: 0.3 })
+        );
+    }
+    #[test]
+    fn test_normalize() {
+        let v1 = Vector { x: 0.5, y: 0.5 };
+        assert_eq!(calculate_norm(&normalize(&v1)).round(), 1_f32);
     }
 }
