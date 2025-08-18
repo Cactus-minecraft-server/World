@@ -28,3 +28,4 @@ Cargo.lock
 # the images
 *.png
 *.jpg
+*.jpeg
