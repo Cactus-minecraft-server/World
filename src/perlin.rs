@@ -65,7 +65,7 @@ pub fn generate_height_chunk(seed: u64, cx: i32, cz: i32) -> [[i32; CHUNK_SIZE];
 
             let ridge = (1.0 - mnt.abs()).powf(1.5); // [0,1]
             let c_cont = cont * 0.5; // [-0.5,0.5]
-            let c_ridge = (ridge - 0.5); // [-0.5,0.5]
+            let c_ridge = ridge - 0.5; // [-0.5,0.5]
             let c_det = det * 0.25; // [-0.25,0.25]
             let c_eros = eros * 0.35; // [-0.35,0.35]
 
