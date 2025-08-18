@@ -7,11 +7,8 @@ use rand_chacha::ChaCha8Rng;
 const CHUNK_SIZE: usize = 16;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Noise {
-    // World-to-lattice scaling factor. Larger => smoother/lower-frequency noise.
     scale: f32,
-    // Output amplitude (scalar multiplier on the Perlin value).
     amplitude: f32,
-    // Global seed for determinism across calls.
     seed: u64,
 }
 
@@ -21,16 +18,66 @@ pub struct Vector {
     y: f32,
 }
 
-pub fn generate_height_chunk(noise: &Noise, cx: i32, cz: i32) -> [[f32; CHUNK_SIZE]; CHUNK_SIZE] {
-    let mut h = [[0.0; CHUNK_SIZE]; CHUNK_SIZE];
-    for lx in 0..CHUNK_SIZE {
-        for lz in 0..CHUNK_SIZE {
-            let wx = (cx * CHUNK_SIZE as i32 + lx as i32) as f32;
-            let wz = (cz * CHUNK_SIZE as i32 + lz as i32) as f32;
-            h[lx][lz] = noise.get(wx, wz);
+const MIN_Y: i32 = -64;
+const MAX_Y: i32 = 320;
+const SEA_LEVEL: i32 = 63;
+
+#[inline]
+fn fbm_seeded(
+    seed: u64,
+    scale: f32,
+    x: f32,
+    z: f32,
+    octaves: u32,
+    persistence: f32,
+    lacunarity: f32,
+) -> f32 {
+    let base = Noise::new(scale, 1.0, seed);
+    let (mut amp, mut freq, mut sum, mut norm) = (1.0f32, 1.0f32, 0.0f32, 0.0f32);
+    for _ in 0..octaves {
+        sum += amp * base.get(x * freq, z * freq);
+        norm += amp;
+        amp *= persistence;
+        freq *= lacunarity;
+    }
+    (sum / norm).clamp(-1.0, 1.0)
+}
+
+pub fn generate_height_chunk(seed: u64, cx: i32, cz: i32) -> [[i32; CHUNK_SIZE]; CHUNK_SIZE] {
+    const SALT_CONT: u64 = 0xC0DEC0DEu64;
+    const SALT_MNT: u64 = 0xBEEF1234u64;
+    const SALT_DET: u64 = 0xDE7ACAFEu64;
+    const SALT_ERO: u64 = 0xE20DFACEu64;
+
+    const GAIN: f32 = 220.0;
+
+    let mut out = [[SEA_LEVEL; CHUNK_SIZE]; CHUNK_SIZE];
+
+    for lz in 0..CHUNK_SIZE {
+        for lx in 0..CHUNK_SIZE {
+            let xw = (cx * CHUNK_SIZE as i32 + lx as i32) as f32;
+            let zw = (cz * CHUNK_SIZE as i32 + lz as i32) as f32;
+
+            let cont = fbm_seeded(seed ^ SALT_CONT, 1500.0, xw, zw, 6, 0.5, 2.0); // [-1,1]
+            let mnt = fbm_seeded(seed ^ SALT_MNT, 400.0, xw, zw, 6, 0.5, 2.0);
+            let det = fbm_seeded(seed ^ SALT_DET, 48.0, xw, zw, 5, 0.5, 2.0);
+            let eros = fbm_seeded(seed ^ SALT_ERO, 1200.0, xw, zw, 5, 0.5, 2.0);
+
+            let ridge = (1.0 - mnt.abs()).powf(1.5); // [0,1]
+            let c_cont = cont * 0.5; // [-0.5,0.5]
+            let c_ridge = (ridge - 0.5); // [-0.5,0.5]
+            let c_det = det * 0.25; // [-0.25,0.25]
+            let c_eros = eros * 0.35; // [-0.35,0.35]
+
+            let s = 0.9 * c_cont + 0.8 * c_ridge + 0.25 * c_det - 0.35 * c_eros;
+
+            let mut y = SEA_LEVEL as f32 + s * GAIN;
+            y = y.clamp(MIN_Y as f32, MAX_Y as f32);
+            out[lx][lz] = y.round() as i32;
         }
     }
-    h
+
+    out
 }
 impl Noise {
     /// Construct a noise generator.
@@ -391,100 +438,47 @@ mod perlin_tests {
 }
 
 #[cfg(test)]
-mod viz {
+mod viz_chunk2 {
     use super::*;
-    use image::{GrayImage, Luma};
-
-    // Render a preview image. Run with: `cargo test -- --ignored`
-    #[test]
-    #[ignore]
-    fn dump_perlin_png() {
-        let noise = Noise::new(64.0, 10.0, 42);
-
-        let (w, h) = (512u32, 512u32);
-        let mut img: GrayImage = GrayImage::new(w, h);
-
-        for y in 0..h {
-            for x in 0..w {
-                let fx = x as f32;
-                let fy = y as f32;
-
-                // Multi-octave (fractal Brownian motion) for richer structure.
-                let mut v = 0.0f32;
-                let mut amp = 1.0f32;
-                let mut freq = 1.0f32;
-                for _ in 0..5 {
-                    v += amp * noise.perlin(fx / noise.scale * freq, fy / noise.scale * freq);
-                    amp *= 0.5;
-                    freq *= 2.0;
-                }
-
-                // Map from roughly [-1,1] to [0,255]
-                let n01 = (v * 0.5 + 0.5).clamp(0.0, 1.0);
-                let p = (n01 * 255.0).round() as u8;
-
-                img.put_pixel(x, y, Luma([p]));
-            }
-        }
-
-        std::fs::create_dir_all("target").ok();
-        img.save("perlin.png").expect("save png");
-    }
-}
-#[cfg(test)]
-mod viz_chunk {
-    use super::*;
-    use image::{GrayImage, Luma};
+    use image::{ImageBuffer, Luma};
 
     #[test]
     #[ignore]
     fn dump_chunk_png() {
-        let noise = Noise::new(64.0, 10.0, 42);
+        let seed: u64 = 42;
         let chunks_x: usize = 32;
         let chunks_z: usize = 32;
 
-        let w = (chunks_x * CHUNK_SIZE) as u32;
-        let h = (chunks_z * CHUNK_SIZE) as u32;
+        let w: u32 = (chunks_x * CHUNK_SIZE) as u32;
+        let h: u32 = (chunks_z * CHUNK_SIZE) as u32;
 
-        let mut field = vec![0.0f32; (w * h) as usize];
-        let mut vmin = f32::INFINITY;
-        let mut vmax = f32::NEG_INFINITY;
+        let mut field = vec![0i32; (w as usize) * (h as usize)];
 
         for cz in 0..chunks_z {
             for cx in 0..chunks_x {
-                let tile = generate_height_chunk(&noise, cx as i32, cz as i32);
-
+                let tile = generate_height_chunk(seed, cx as i32, cz as i32);
                 for lz in 0..CHUNK_SIZE {
                     for lx in 0..CHUNK_SIZE {
                         let x = cx * CHUNK_SIZE + lx;
                         let z = cz * CHUNK_SIZE + lz;
-                        let idx = z * (w as usize) + x;
-
-                        let v = tile[lx][lz];
-                        field[idx] = v;
-                        if v < vmin {
-                            vmin = v;
-                        }
-                        if v > vmax {
-                            vmax = v;
-                        }
+                        field[z * (w as usize) + x] = tile[lx][lz];
                     }
                 }
             }
         }
 
-        let mut img: GrayImage = GrayImage::new(w, h);
-        let span = (vmax - vmin).max(std::f32::EPSILON);
-        for z in 0..(h as usize) {
-            for x in 0..(w as usize) {
-                let v = field[z * (w as usize) + x];
-                let n01 = ((v - vmin) / span).clamp(0.0, 1.0);
-                let p = (n01 * 255.0).round() as u8;
-                img.put_pixel(x as u32, z as u32, Luma([p]));
+        let mut img: ImageBuffer<Luma<u16>, Vec<u16>> = ImageBuffer::new(w, h);
+        let denom = (MAX_Y - MIN_Y) as f32;
+        for z in 0..h {
+            for x in 0..w {
+                let v = field[(z as usize) * (w as usize) + (x as usize)];
+                let n01 = ((v - MIN_Y) as f32 / denom).clamp(0.0, 1.0);
+                let p = (n01 * u16::MAX as f32).round() as u16;
+                img.put_pixel(x, z, Luma([p]));
             }
         }
 
         std::fs::create_dir_all("target").ok();
-        img.save("chunk_heightmap.png").expect("save png");
+        img.save("target/heightmap16.png").unwrap();
     }
 }
