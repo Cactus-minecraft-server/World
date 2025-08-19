@@ -4,7 +4,7 @@ use rand::{
 };
 use rand_chacha::ChaCha8Rng;
 
-const CHUNK_SIZE: usize = 16;
+pub const CHUNK_SIZE: usize = 16;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Noise {
     scale: f32,
@@ -18,9 +18,9 @@ pub struct Vector {
     y: f32,
 }
 
-const MIN_Y: i32 = -64;
-const MAX_Y: i32 = 320;
-const SEA_LEVEL: i32 = 63;
+pub const MIN_Y: i32 = -64;
+pub const MAX_Y: i32 = 320;
+pub const SEA_LEVEL: i32 = 63;
 
 #[inline]
 fn fbm_seeded(
@@ -211,12 +211,14 @@ fn linear_interpolation(a: f32, b: f32, t: f32) -> f32 {
 
 #[cfg(test)]
 mod tests {
+    use crate::perlin::{
+        Noise, Vector, calculate_norm, dot_product, fade, linear_interpolation, normalize,
+    };
+
     fn deriv(f: fn(f32) -> f32, x: f32) -> f32 {
         let h = 1e-3;
         (f(x + h) - f(x - h)) / (2.0 * h)
     }
-
-    use super::*;
 
     fn approx_eq(a: f32, b: f32, eps: f32) -> bool {
         (a - b).abs() <= eps
@@ -434,51 +436,5 @@ mod perlin_tests {
         let c0 = n.get(x, y);
         assert!((n.get(x + h, y) - c0).abs() < 0.1);
         assert!((n.get(x, y + h) - c0).abs() < 0.1);
-    }
-}
-
-#[cfg(test)]
-mod viz_chunk2 {
-    use super::*;
-    use image::{ImageBuffer, Luma};
-
-    #[test]
-    #[ignore]
-    fn dump_chunk_png() {
-        let seed: u64 = 42;
-        let chunks_x: usize = 32;
-        let chunks_z: usize = 32;
-
-        let w: u32 = (chunks_x * CHUNK_SIZE) as u32;
-        let h: u32 = (chunks_z * CHUNK_SIZE) as u32;
-
-        let mut field = vec![0i32; (w as usize) * (h as usize)];
-
-        for cz in 0..chunks_z {
-            for cx in 0..chunks_x {
-                let tile = generate_height_chunk(seed, cx as i32, cz as i32);
-                for lz in 0..CHUNK_SIZE {
-                    for lx in 0..CHUNK_SIZE {
-                        let x = cx * CHUNK_SIZE + lx;
-                        let z = cz * CHUNK_SIZE + lz;
-                        field[z * (w as usize) + x] = tile[lx][lz];
-                    }
-                }
-            }
-        }
-
-        let mut img: ImageBuffer<Luma<u16>, Vec<u16>> = ImageBuffer::new(w, h);
-        let denom = (MAX_Y - MIN_Y) as f32;
-        for z in 0..h {
-            for x in 0..w {
-                let v = field[(z as usize) * (w as usize) + (x as usize)];
-                let n01 = ((v - MIN_Y) as f32 / denom).clamp(0.0, 1.0);
-                let p = (n01 * u16::MAX as f32).round() as u16;
-                img.put_pixel(x, z, Luma([p]));
-            }
-        }
-
-        std::fs::create_dir_all("target").ok();
-        img.save("target/heightmap16.png").unwrap();
     }
 }
