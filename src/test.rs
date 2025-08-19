@@ -52,7 +52,6 @@ mod level_file_test {
     #[test]
     fn test_creation_of_file() -> () {
         let result = create_nbt(
-            "test".to_string(),
             1234,
             true,
             true,
@@ -73,6 +72,66 @@ mod level_file_test {
             "test".to_string(),
             "target/level.dat".to_string(),
         );
+        assert_eq!(result.is_ok(), true);
+    }
+}
+/// Test for player.rs
+#[cfg(test)]
+mod player_data_test {
+    use crate::player::{Item, PlayerData, create_nbt};
+
+    #[test]
+    fn test_playerdata_creation() {
+        let item = Item {
+            count: 1,
+            slot: 0,
+            metadata: 0,
+            id: "minecraft:stone".to_string(),
+        };
+
+        let data = PlayerData {
+            inventory: vec![item],
+            motion: [0.0, 0.0],
+            position: [0.0, 64.0, 0.0],
+            rotation: [0.0, 0.0],
+            absorbtion_amount: 0.0,
+            air: 300,
+            current_impulse_context_reset_grace_time: 0,
+            data_version: 3465,
+            death_time: 0,
+            dimension: "minecraft:overworld".to_string(),
+            fall_distance: 0.0,
+            fall_flying: false,
+            fire: -20,
+            food_exhaustion_level: 0.0,
+            food_level: 20,
+            food_saturation_level: 5.0,
+            food_tick_timer: 0,
+            health: 20.0,
+            hurt_by_timestamp: 0,
+            hurt_time: 0,
+            ignore_fall_damage_from_current_explosion: false,
+            invulnerable: false,
+            on_ground: true,
+            player_game_type: 0,
+            portal_cooldown: 0,
+            score: 0,
+            seen_credits: false,
+            selected_item_slot: 0,
+            sleep_timer: 0,
+            spawn_extra_particles_on_fall: false,
+            xp_level: 0,
+            xp_p: 0.0,
+            xp_seed: 0,
+            xp_total: 0,
+            uuid: [0, 0, 0, 0],
+        };
+        let result = create_nbt(
+            &"8c701aa5-e353-42dd-aa71-95d76b63a5d7".into(),
+            data,
+            "target/".into(),
+        );
+
         assert_eq!(result.is_ok(), true);
     }
 }

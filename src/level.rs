@@ -3,7 +3,6 @@ use std::fs::File;
 use nbt::{Tag, write_nbt};
 
 pub fn create_nbt(
-    name: String,
     seed: i64,
     is_hardcore: bool,
     structures: bool,
@@ -24,7 +23,7 @@ pub fn create_nbt(
     level_name: String,
     path: String,
 ) -> std::io::Result<()> {
-    let mut root = Tag::new_compound(name);
+    let mut root = Tag::new_compound("Data");
     root.insert("RandomSeed".to_string(), Tag::new_long("RandomSeed", seed));
     root.insert(
         "hardcore".to_string(),
