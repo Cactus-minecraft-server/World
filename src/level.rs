@@ -1,6 +1,103 @@
-use nbt::{Tag, write_nbt};
+use nbt::{Tag, Writer, write_nbt};
 use std::collections::HashMap;
 use std::fs::File;
+
+pub struct CustomBossEvents {
+    boss: Vec<String>,
+}
+
+impl Default for CustomBossEvents {
+    fn default() -> Self {
+        Self {
+            boss: ["".into()].into(),
+        }
+    }
+}
+
+pub struct DataPacks {
+    pub disabled: Vec<String>,
+    pub enabled: Vec<String>,
+}
+impl Default for DataPacks {
+    fn default() -> Self {
+        Self {
+            disabled: [
+                "minecraft_improvement".into(),
+                "redstone_experiments".into(),
+                "trade_rebalance".into(),
+            ]
+            .into(),
+            enabled: ["vanilla".into()].into(),
+        }
+    }
+}
+
+pub struct DragonFight {
+    pub gateways: Vec<i32>,
+    pub dragon_killed: bool,
+    pub needs_state_scanning: bool,
+    pub previously_killed: bool,
+}
+impl Default for DragonFight {
+    fn default() -> Self {
+        Self {
+            gateways: [].into(),
+            dragon_killed: false,
+            needs_state_scanning: true,
+            previously_killed: false,
+        }
+    }
+}
+
+pub type GameRules = HashMap<String, String>;
+
+pub struct VersionInfo {
+    pub id: i32,
+    pub name: String,
+    pub series: String,
+    pub snapshot: bool,
+}
+impl Default for VersionInfo {
+    fn default() -> Self {
+        Self {
+            id: 4440,
+            name: "1.21.8".into(),
+            series: "main".into(),
+            snapshot: false,
+        }
+    }
+}
+
+pub enum Dimension {
+    Overworld,
+    End,
+    Nether,
+}
+
+pub struct WorldGenSettings {
+    pub dimensions: HashMap<String, Dimension>,
+    pub bonus_chest: bool,
+    pub generate_features: bool,
+    pub seed: i64,
+}
+
+impl Default for WorldGenSettings {
+    fn default() -> Self {
+        let mut dim: HashMap<String, Dimension> = HashMap::new();
+        dim.insert("Overworld".into(), Dimension::Overworld);
+        dim.insert("Nether".into(), Dimension::Nether);
+        dim.insert("The_End".into(), Dimension::End);
+
+        Self {
+            dimensions: dim,
+            bonus_chest: false,
+            generate_features: true,
+            seed: 42,
+        }
+    }
+}
+
+pub type ServerBrands = Vec<String>;
 
 pub struct LevelDat {
     pub custom_boss_events: CustomBossEvents,
@@ -9,7 +106,7 @@ pub struct LevelDat {
     pub game_rules: GameRules,
     pub version: VersionInfo,
     pub world_gen_settings: WorldGenSettings,
-    pub scheduled_events: ScheduledEvents,
+    pub scheduled_events: Vec<String>,
     pub server_brands: ServerBrands,
 
     pub allow_commands: bool,
@@ -48,46 +145,53 @@ pub struct LevelDat {
     pub wandering_trader_spawn_delay: i32,
     pub was_modded: bool,
 }
-
-pub struct CustomBossEvents {}
-
-pub struct DataPacks {
-    pub disabled: Vec<String>,
-    pub enabled: Vec<String>,
+impl Default for LevelDat {
+    fn default() -> Self {
+        Self {
+            custom_boss_events: CustomBossEvents::default(),
+            data_packs: DataPacks::default(),
+            dragon_fight: DragonFight::default(),
+            game_rules: GameRules::default(),
+            version: VersionInfo::default(),
+            world_gen_settings: WorldGenSettings::default(),
+            scheduled_events: ["".into()].into(),
+            server_brands: ServerBrands::default(),
+            allow_commands: false,
+            border_center_x: 0.0,
+            border_center_z: 0.0,
+            border_damage_per_block: 0.2,
+            border_safe_zone: 5.0,
+            border_size: 59999968.0,
+            border_size_lerp_target: 59999968.0,
+            border_size_lerp_time: 0,
+            border_warning_blocks: 15,
+            border_warning_time: 15,
+            clear_weather_time: 0,
+            data_version: 4440,
+            day_time: 95,
+            difficulty: 1,
+            difficulty_locked: false,
+            game_type: 0,
+            hardcore: false,
+            initialized: true,
+            last_played: 0,
+            level_name: "World".into(),
+            raining: false,
+            rain_time: 0,
+            spawn_angle: 0.0,
+            spawn_x: 0,
+            spawn_y: 82,
+            spawn_z: 0,
+            thundering: false,
+            thunder_time: 0,
+            time: 95,
+            version_id: 19133,
+            wandering_trader_spawn_chance: 25,
+            wandering_trader_spawn_delay: 24000,
+            was_modded: false,
+        }
+    }
 }
-
-pub struct DragonFight {
-    pub gateways: Vec<i32>,
-    pub dragon_killed: bool,
-    pub needs_state_scanning: bool,
-    pub previously_killed: bool,
-}
-
-pub type GameRules = HashMap<String, String>;
-
-pub struct VersionInfo {
-    pub id: i32,
-    pub name: String,
-    pub series: String,
-    pub snapshot: i8,
-}
-
-pub enum Dimension {
-    Overworld,
-    End,
-    Nether,
-}
-
-pub struct WorldGenSettings {
-    pub dimensions: HashMap<String, Dimension>,
-    pub bonus_chest: bool,
-    pub generate_features: bool,
-    pub seed: i64,
-}
-
-pub struct ScheduledEvents {}
-
-pub type ServerBrands = Vec<String>;
 fn dim_to_str(d: &Dimension) -> &'static str {
     match d {
         Dimension::Overworld => "overworld",
@@ -262,7 +366,7 @@ pub fn create_nbt(level: &LevelDat, path: &str) -> std::io::Result<()> {
     );
     ver.insert(
         "Snapshot".to_string(),
-        Tag::new_byte("Snapshot", level.version.snapshot),
+        Tag::new_byte("Snapshot", i8::from(level.version.snapshot)),
     );
     root.insert("Version".to_string(), ver);
 
@@ -380,6 +484,7 @@ pub fn create_nbt(level: &LevelDat, path: &str) -> std::io::Result<()> {
 
     // --- write ---
     let file = File::create(format!("{path}/level.dat"))?;
-    write_nbt(&root, file)?;
+    let mut w = Writer::to_gzip(file);
+    w.write_tag(&root)?;
     Ok(())
 }

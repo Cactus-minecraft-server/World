@@ -1,5 +1,7 @@
-use nbt::{Tag, write_nbt};
+use nbt::{Tag, Writer, write_nbt};
 use std::fs::File;
+
+use crate::level::Dimension;
 pub struct PlayerData {
     pub inventory: Vec<Item>,
     pub motion: [f64; 2],
@@ -10,7 +12,7 @@ pub struct PlayerData {
     pub current_impulse_context_reset_grace_time: i32,
     pub data_version: i32,
     pub death_time: i16,
-    pub dimension: String,
+    pub dimension: Dimension,
     pub fall_distance: f64,
     pub fall_flying: bool,
     pub fire: i16,
@@ -37,11 +39,60 @@ pub struct PlayerData {
     pub xp_total: i32,
     pub uuid: [i32; 4],
 }
+impl Default for PlayerData {
+    fn default() -> Self {
+        Self {
+            inventory: [].into(),
+            motion: [0.0, 0.0].into(),
+            position: [0.0, 0.0, 0.0].into(),
+            rotation: [0.0, 0.0].into(),
+            absorbtion_amount: 0.0,
+            air: 300,
+            current_impulse_context_reset_grace_time: 0,
+            data_version: 4440,
+            death_time: 0,
+            dimension: Dimension::Overworld,
+            fall_distance: 0.0,
+            fall_flying: false,
+            fire: -20,
+            food_exhaustion_level: 0.0,
+            food_level: 20,
+            food_saturation_level: 5.0,
+            food_tick_timer: 0,
+            health: 20.0,
+            hurt_by_timestamp: 0,
+            hurt_time: 0,
+            ignore_fall_damage_from_current_explosion: false,
+            invulnerable: false,
+            on_ground: true,
+            player_game_type: 0,
+            portal_cooldown: 0,
+            score: 0,
+            seen_credits: false,
+            selected_item_slot: 0,
+            sleep_timer: 0,
+            spawn_extra_particles_on_fall: false,
+            xp_level: 0,
+            xp_p: 0.0,
+            xp_seed: 0,
+            xp_total: 0,
+            uuid: [0, 0, 0, 0],
+        }
+    }
+}
 pub struct Item {
     pub count: i8,
     pub slot: i8,
     pub metadata: i16,
     pub id: String,
+}
+
+fn dim_to_str(d: &Dimension) -> &'static str {
+    match d {
+        Dimension::Overworld => "overworld",
+        Dimension::End => "the_end",
+        Dimension::Nether => "the_nether",
+    }
 }
 pub fn create_nbt(uuid: &String, player_data: PlayerData, path: String) -> std::io::Result<()> {
     let mut root = Tag::new_compound(uuid);
@@ -85,7 +136,7 @@ pub fn create_nbt(uuid: &String, player_data: PlayerData, path: String) -> std::
     );
     root.insert(
         "Dimension".into(),
-        Tag::new_string("Dimension", player_data.dimension),
+        Tag::new_string("Dimension", dim_to_str(&player_data.dimension)),
     );
     root.insert(
         "fall_distance".into(),
@@ -183,6 +234,7 @@ pub fn create_nbt(uuid: &String, player_data: PlayerData, path: String) -> std::
     );
 
     let file = File::create(format!("{path}/{uuid}.dat"))?;
-    write_nbt(&root, file)?;
+    let mut w = Writer::to_gzip(file);
+    w.write_tag(&root)?;
     Ok(())
 }
