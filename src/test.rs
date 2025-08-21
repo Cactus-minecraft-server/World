@@ -57,7 +57,7 @@ mod level_file_test {
             ..Default::default()
         };
 
-        let result = create_nbt(&level, "target");
+        let result = create_nbt(&level, "target/level.dat");
         assert!(result.is_ok());
     }
 }
