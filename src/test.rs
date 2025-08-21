@@ -48,33 +48,90 @@ mod perlin_test {
 /// Test for level.rs
 #[cfg(test)]
 mod level_file_test {
-    use crate::level::create_nbt;
+    use crate::level::{
+        CustomBossEvents, DataPacks, Dimension, DragonFight, LevelDat, ScheduledEvents,
+        ServerBrands, VersionInfo, WorldGenSettings, create_nbt,
+    };
+    use std::collections::HashMap;
+
     #[test]
-    fn test_creation_of_file() -> () {
-        let result = create_nbt(
-            1234,
-            true,
-            true,
-            true,
-            true,
-            1,
-            1,
-            1,
-            0,
-            0,
-            0,
-            213,
-            1235,
-            55555,
-            90000,
-            900,
-            "test".to_string(),
-            "test".to_string(),
-            "target/level.dat".to_string(),
-        );
-        assert_eq!(result.is_ok(), true);
+    fn test_creation_of_file() {
+        let mut game_rules: HashMap<String, String> = HashMap::new();
+        game_rules.insert("doDaylightCycle".into(), "true".into());
+
+        let mut dimensions: HashMap<String, Dimension> = HashMap::new();
+        dimensions.insert("minecraft:overworld".into(), Dimension::Overworld);
+
+        let level = LevelDat {
+            custom_boss_events: CustomBossEvents {},
+            data_packs: DataPacks {
+                disabled: vec![],
+                enabled: vec![],
+            },
+            dragon_fight: DragonFight {
+                gateways: vec![0, 1, 2],
+                dragon_killed: false,
+                needs_state_scanning: false,
+                previously_killed: false,
+            },
+            game_rules,
+            version: VersionInfo {
+                id: 3465,
+                name: "1.20.1".into(),
+                series: "main".into(),
+                snapshot: 0,
+            },
+            world_gen_settings: WorldGenSettings {
+                dimensions,
+                bonus_chest: false,
+                generate_features: true,
+                seed: 1234,
+            },
+            scheduled_events: ScheduledEvents {},
+            server_brands: ServerBrands::from(vec!["vanilla".to_string()]),
+
+            allow_commands: true,
+
+            border_center_x: 0.0,
+            border_center_z: 0.0,
+            border_damage_per_block: 0.0,
+            border_safe_zone: 0.0,
+            border_size: 60_000_000.0,
+            border_size_lerp_target: 60_000_000.0,
+            border_size_lerp_time: 0,
+            border_warning_blocks: 5,
+            border_warning_time: 15,
+
+            clear_weather_time: 0,
+            data_version: 3465,
+            day_time: 0,
+            difficulty: 2,
+            difficulty_locked: false,
+            game_type: 0,
+            hardcore: false,
+            initialized: true,
+            last_played: 0,
+            level_name: "test".into(),
+            raining: false,
+            rain_time: 0,
+            spawn_angle: 0.0,
+            spawn_x: 0,
+            spawn_y: 64,
+            spawn_z: 0,
+            thundering: false,
+            thunder_time: 0,
+            time: 0,
+            version_id: 3465,
+            wandering_trader_spawn_chance: 25,
+            wandering_trader_spawn_delay: 1200,
+            was_modded: false,
+        };
+
+        let result = create_nbt(&level, "target");
+        assert!(result.is_ok());
     }
 }
+
 /// Test for player.rs
 #[cfg(test)]
 mod player_data_test {
