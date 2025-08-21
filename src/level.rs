@@ -1,4 +1,4 @@
-use nbt::{Tag, Writer, write_nbt};
+use nbt::{Tag, Writer};
 use std::collections::HashMap;
 use std::fs::File;
 
@@ -483,7 +483,7 @@ pub fn create_nbt(level: &LevelDat, path: &str) -> std::io::Result<()> {
     );
 
     // --- write ---
-    let file = File::create(format!("{path}/level.dat"))?;
+    let file = File::create(path)?;
     let mut w = Writer::to_gzip(file);
     w.write_tag(&root)?;
     Ok(())
