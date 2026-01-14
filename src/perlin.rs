@@ -63,7 +63,8 @@ pub fn generate_height_chunk(seed: u64, cx: i32, cz: i32) -> [[i32; CHUNK_SIZE];
             let det = fbm_seeded(seed ^ SALT_DET, 48.0, xw, zw, 5, 0.5, 2.0);
             let eros = fbm_seeded(seed ^ SALT_ERO, 1200.0, xw, zw, 5, 0.5, 2.0);
 
-            let ridge = (1.0 - mnt.abs()).powf(1.5); // [0,1]
+            let a = 1.0 - mnt.abs(); // [0,1]
+            let ridge = a * a * a.sqrt();
             let c_cont = cont * 0.5; // [-0.5,0.5]
             let c_ridge = ridge - 0.5; // [-0.5,0.5]
             let c_det = det * 0.25; // [-0.25,0.25]
@@ -160,18 +161,33 @@ fn hash2(ix: i32, iy: i32, seed: u64) -> u64 {
 }
 
 /// Deterministic unit gradient at lattice point (ix, iy) from `seed`.
+#[inline]
 fn gradient_at(ix: i32, iy: i32, seed: u64) -> Vector {
+    const G: [Vector; 8] = [
+        Vector { x: 1.0, y: 0.0 },
+        Vector { x: -1.0, y: 0.0 },
+        Vector { x: 0.0, y: 1.0 },
+        Vector { x: 0.0, y: -1.0 },
+        Vector {
+            x: 0.70710677,
+            y: 0.70710677,
+        },
+        Vector {
+            x: -0.70710677,
+            y: 0.70710677,
+        },
+        Vector {
+            x: 0.70710677,
+            y: -0.70710677,
+        },
+        Vector {
+            x: -0.70710677,
+            y: -0.70710677,
+        },
+    ];
+
     let h = hash2(ix, iy, seed);
-    let mut rng = ChaCha8Rng::seed_from_u64(h);
-
-    // [0, 2π]
-    let dist = Uniform::new(0.0f32, std::f32::consts::TAU).unwrap();
-    let angle: f32 = dist.sample(&mut rng);
-
-    Vector {
-        x: angle.cos(),
-        y: angle.sin(),
-    }
+    G[(h as usize) & 7]
 }
 
 /// Dot product of two 2D vectors.
@@ -200,8 +216,12 @@ fn normalize(v1: &Vector) -> Vector {
 /// Quintic fade function used by Perlin noise.
 /// Maps x ∈ [0,1] to a smooth S-curve with zero first derivative at 0 and 1.
 /// 6x⁵ − 15x⁴ + 10x³
+#[inline]
 fn fade(x: f32) -> f32 {
-    6_f32 * x.powi(5) - 15_f32 * x.powi(4) + 10_f32 * x.powi(3)
+    // 6x^5 - 15x^4 + 10x^3
+    let x2 = x * x;
+    let x3 = x2 * x;
+    x3 * (x * (x * 6.0 - 15.0) + 10.0)
 }
 
 /// Linear interpolation between scalars `a` and `b` by factor `t`.
